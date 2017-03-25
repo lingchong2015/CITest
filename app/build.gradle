@@ -1,0 +1,210 @@
+apply plugin: 'com.android.application'
+//apply plugin: RunPlugin
+apply plugin: 'com.curry.stephen.run'
+
+android.variantFilter { variant ->
+    if (variant.buildType.name == 'release') {
+        variant.getFlavors().each() { flavor ->
+            if (flavor.name == 'blue') {
+                variant.setIgnore(true)
+            }
+        }
+    }
+}
+
+android {
+    compileSdkVersion rootProject.ext.compileSdkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    defaultConfig {
+        applicationId "com.curry.stephen.myapplication"
+        minSdkVersion 16
+        targetSdkVersion 25
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        staging.initWith(signingConfigs.debug)
+
+        release {
+            storeFile file('../dirk41')
+            storePassword ''
+            keyAlias 'key0'
+            keyPassword ''
+        }
+    }
+
+    flavorDimensions 'color', 'price'
+    productFlavors {
+        red {
+            dimension 'color'
+            applicationIdSuffix '.red'
+            versionCode 2
+        }
+
+        blue {
+            dimension 'color'
+            applicationIdSuffix '.blue'
+            minSdkVersion 16
+            versionCode 3
+        }
+
+        free {
+            dimension 'price'
+        }
+
+        paid {
+            dimension 'price'
+        }
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField "String", "Hello", "\"你好！\""
+            resValue "string", "authorName", "凌冲"
+            testCoverageEnabled = true
+        }
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            buildConfigField "String", "Hello", "\"您好！\""
+            resValue "string", "authorName", "Ling Chong"
+        }
+        staging.initWith(buildTypes.release)
+        staging {
+            applicationIdSuffix = '.staging'
+            versionNameSuffix = '.staging'
+            debuggable = false
+        }
+    }
+    useLibrary "org.apache.http.legacy"
+
+//    task helloWorld {
+//        println 'Configuration'
+//
+//        doLast {
+//            println '3th Execution'
+//        }
+//
+//        doLast {
+//            println '4th Execution'
+//        }
+//
+//        doFirst {
+//            println '2nd Execution'
+//        }
+//
+//        doFirst {
+//            println '1st Execution'
+//        }
+//    }
+//
+//    task anotherTask {
+//        println 'Another one configuration'
+//    }
+//
+//    helloWorld.mustRunAfter anotherTask
+
+    tasks.whenTaskAdded { theTask ->
+        if (theTask.name == 'packageRedPaidRelease' || theTask.name == 'packageRedFreeRelease') {
+            println 'Hook into packageRelease.'
+            theTask.dependsOn 'getReleasePassword'
+        }
+//        else {
+//            println 'whenTaskAdded: ' + theTask.name
+//        }
+    }
+
+    task getReleasePassword doLast {
+        def storePassword
+        def keyPassword
+
+        if (rootProject.file('private.properties').exists()) {
+            Properties properties = new Properties();
+            properties.load(rootProject.file('private.properties').newDataInputStream());
+            storePassword = properties.getProperty('release.storepassword')
+            keyPassword = properties.getProperty('release.keypassword')
+        } else {
+            println 'File does\'t exsit.'
+        }
+
+        if (!storePassword?.trim()) {
+            System.out.println "\n Please enter store password or write storepassword property in private.properties which creating at module directory."
+            Scanner scanner = new Scanner(System.in)
+            storePassword = scanner.nextLine()
+        }
+        if (!keyPassword?.trim()) {
+            System.out.println "\n Please enter key password or write keypassword property in private.properties which creating at module directory."
+            Scanner scanner = new Scanner(System.in)
+            keyPassword = scanner.nextLine()
+        }
+
+        android.signingConfigs.release.storePassword = storePassword
+        android.signingConfigs.release.keyPassword = keyPassword
+    }
+
+    android.applicationVariants.all { variant ->
+        println 'Variant: ' + variant.name
+        variant.outputs.each { output ->
+            def file = output.outputFile
+            println 'Variant output: ' + file.name
+            output.outputFile = new File(file.parent, file.name.replace(".apk", "-${variant.versionName}.apk"))
+            println 'Variant output modified: ' + output.outputFile.name
+        }
+    }
+}
+
+//class RunPlugin implements Plugin<Project> {
+//
+//    @Override
+//    void apply(Project target) {
+//        target.android.applicationVariants.all { variant ->
+//            if (variant.install) {
+//                target.tasks.create(name: "run${variant.name.capitalize()}", dependsOn: variant.install) {
+//                    description "Installs the ${variant.description} and runs the main launcher activity."
+//                    println "ApplicationId of ${variant.name}: ${variant.applicationId}"
+//                    doFirst {
+//                        println 'Running the Activity.'
+//
+//                        def xmlFile = target.file('\\src\\main\\AndroidManifest.xml')
+//                        def androidManifest = new XmlSlurper().parse(xmlFile)
+//                        def packageName = androidManifest['@package']
+////                    def classpath = android.defaultConfig.applicationId
+////                    if (variant.buildType.applicationIdSuffix) {
+////                        classpath -= "${variant.buildType.applicationIdSuffix}"
+////                    }
+//                        def launchClass = "${variant.applicationId}/${packageName}.MainActivity"
+//                        project.exec {
+//                            executable = 'adb'
+//                            args = ['shell', 'am', 'start', '-n', launchClass]
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
+
+dependencies {
+    compile fileTree(include: ['*.jar'], dir: 'libs')
+    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    })
+//    compile project(':mylibrary')
+    //    compile 'com.loopj.android:android-async-http:1.4.9'
+    //    compile project(':mywearablemodule')
+//    compile project(':lib')
+    //    wearApp project(':mywearablemodule')
+    compile 'com.android.support:appcompat-v7:25.3.0'
+    compile 'com.android.support.constraint:constraint-layout:1.0.1'
+    compile 'com.android.support:design:25.3.0'
+    compile 'com.loopj.android:android-async-http:1.4.9'
+    compile 'com.google.code.findbugs:jsr305:2.0.1'
+    testCompile 'junit:junit:4.12'
+    testCompile 'org.robolectric:shadows-support-v4:3.3.1'
+    testCompile 'org.robolectric:robolectric:3.3.1'
+    testCompile 'org.khronos:opengl-api:gl1.1-android-2.1_r1'
+}
+
